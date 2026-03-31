@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Derived data (large, regeneratable — run zg_db_stats.py)
+output/tower/npz/
+output/cloudnet/npz/
+output/comparison/npz/
+
+# Figures are committed so results are visible on GitHub
+# (comment out the lines below to also ignore them)
+# output/tower/*.png
+# output/cloudnet/*.png
+# output/comparison/*.png
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+*.swp

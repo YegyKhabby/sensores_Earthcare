@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip install:*)",
+      "Bash(python3 -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(python3 -m pip install raincoat/ --no-build-isolation -q)",
+      "Bash(python3 -m pip install raincoat/ --no-build-isolation)",
+      "Bash(PYTHONPATH=/work/yegy_project/Feb2026_new/raincoat python3 comparison/compare_ze_fwd_cloudnet_masked_20250606.py)",
+      "Bash(python3 comparison/compare_ze.py /data/obs/site/jue/cloudnet/clu_processing/categorize/2025/20250606_juelich_categorize.nc)",
+      "Bash(python3 -:*)",
+      "Read(//data/obs/site/jue/**)",
+      "Bash(find /data/obs/site/jue -name *parsivel* -o -name *disdrometer*)",
+      "Bash(find /data/obs/site/jue -name *.znc)",
+      "Read(//data/**)",
+      "Bash(grep \"\\\\.nc$\")"
+    ]
+  }
+}
