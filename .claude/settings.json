@@ -12,7 +12,9 @@
       "Bash(find /data/obs/site/jue -name *parsivel* -o -name *disdrometer*)",
       "Bash(find /data/obs/site/jue -name *.znc)",
       "Read(//data/**)",
-      "Bash(grep \"\\\\.nc$\")"
+      "Bash(grep \"\\\\.nc$\")",
+      "Bash(git add:*)",
+      "Bash(git push:*)"
     ]
   }
 }
