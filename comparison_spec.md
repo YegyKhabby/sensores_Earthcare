@@ -9,14 +9,31 @@ lowest radar gate, purely due to vertical separation?
 
 ---
 
-## Instruments
+## Site and Instruments
+
+### JOYCE site
+
+JOYCE (Jülich Observatory for Cloud Evolution) is the radar site. Altitude: **114 m ASL**.
+The JOYRAD-35 radar is located here. It operates at **35.5 GHz (Ka-band, ~8.5 mm wavelength)**.
+
+### Radar — JOYRAD-35 (same physical instrument for both comparisons)
+
+JOYRAD-35 alternates between two scanning modes:
+- **Vertical mode (~25 min of each 30-min cycle):** feeds CloudNet categorize files (Comparison B)
+- **Tilted mode (19° elevation, ~2 min burst per cycle):** records Tower ZNC files (Comparison A)
+
+Because it is the **same physical radar with a single calibration**, any systematic radar calibration
+bias is **identical in both comparisons and cancels** when computing the differential
+`Bias_B − Bias_A`. The differential isolates the vertical-separation signal alone.
+
+### Instrument table
 
 | Instrument | Location | Temporal resolution | Availability |
 |---|---|---|---|
-| JOYCE Parsivel | Surface, next to radar | 1 min | Continuous |
-| Tower Parsivel (452070) | Tower, ~211 m ASL | 1 min | Continuous |
-| CloudNet (vertical beam) | JOYCE site | 30 sec | ~25 min / 30 min (nearly continuous) |
-| Tower radar Zg (tilted beam, 19°) | JOYCE site → tower | ~1 sec | 2 min burst every ~30 min |
+| JOYCE Parsivel | Surface, next to radar (~114 m ASL) | 1 min | Continuous |
+| Tower Parsivel (452070) | Tower, **211 m ASL** | 1 min | Continuous |
+| JOYRAD-35 vertical beam | JOYCE site | 30 sec | ~25 min / 30 min (nearly continuous) |
+| JOYRAD-35 tilted beam (19°) | JOYCE site → tower direction | ~1 sec | 2 min burst every ~30 min |
 
 ---
 
@@ -28,7 +45,7 @@ lowest radar gate, purely due to vertical separation?
 Parsivel and radar are measuring the same air volume.
 
 - Ze_fwd: forward-simulated from **Tower Parsivel** (T-matrix, 35.5 GHz, 19° elevation)
-- Ze_radar: **Tower radar Zg** at gate 6 (117 m above JOYCE ground, ~228 m ASL) — confirmed as the gate closest to the Tower Parsivel altitude
+- Ze_radar: **Tower radar Zg** at **gate 6** (117 m slant range above JOYCE, **231 m ASL**) — hardware-fixed gate, closest to Tower Parsivel altitude (211 m ASL, ~20 m below)
 
 ### Comparison B — CloudNet (different heights, the real measurement)
 
@@ -62,6 +79,36 @@ than the CloudNet comparison. This is why all 18 available rain dates must be
 Almost no Parsivel minutes are dropped. The vertical beam provides 2 CloudNet
 snapshots per Parsivel minute (30-sec resolution, nearly continuous).
 
+### Timestamp corrections applied before pairing
+
+**Parsivel end-of-interval convention:** Parsivel timestamps mark the *end* of the 1-minute
+integration window, not the centre. Correct by subtracting 30 s before matching:
+```python
+t_p_unix -= 30.0  # shift to mid-interval
+```
+
+**CloudNet fall-time shift:** CloudNet Ze at the lowest gate (~255 m ASL) was measured
+~144 m above the surface. At typical fall speeds of 5–6 m/s the hydrometeors measured
+by the surface Parsivel left the radar gate ~25–30 s earlier. Correct by shifting the
+CloudNet timestamps *back* by 30 s (i.e. a CloudNet observation at time T is paired
+with a Parsivel observation at T+30 s):
+```python
+CN_TIME_SHIFT_S = 30.0  # subtract from CloudNet timestamps before matching
+```
+No such shift is applied for the Tower comparison because the radar gate (231 m ASL)
+and Parsivel (211 m ASL) are nearly co-located vertically.
+
+### Key configuration constants
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `TOWER_GATE` | 6 | Hardware-fixed gate index in Tower ZNC files |
+| `TOL_S` | 30.0 s | Matching window half-width (±30 s) |
+| `CN_TIME_SHIFT_S` | 30.0 s | CloudNet timestamp shift for fall time |
+| `ELEV_DEG` | 19.0° | JOYRAD-35 tilt angle for Tower mode |
+| `SITE_ALT_M` | 114.0 m | JOYCE site altitude ASL |
+| `DISDRO_ALT_M` | 211.0 m | Tower Parsivel altitude ASL |
+
 ### Averaging in linear units
 Always average Ze in linear units (mm⁶/m³), then convert:
 
@@ -94,7 +141,7 @@ Compute for each comparison, **pooled across all available dates**:
 | N | count of valid pairs | — |
 | Bias | mean(Ze_radar − Ze_fwd) | dBZ |
 | RMSE | sqrt( mean( (Ze_radar − Ze_fwd)² ) ) | dBZ |
-| Bootstrap 95% CI on bias | 1000 resamples with replacement | dBZ |
+| Bootstrap 95% CI on bias | 5000 resamples with replacement | dBZ |
 
 Compute in **dBZ domain** (after averaging linearly and converting).
 
@@ -133,10 +180,12 @@ More dates should be added to match the tower date range.
 
 ## Resolved Questions
 
-1. CloudNet lowest gate: 255 m AMSL (gate 0 of the categorize file height grid).
-2. No diameter filter — FWD uses all drop sizes (D-filter was removed as it creates an asymmetry the radar cannot replicate).
-3. Tower Parsivel (452070) is at 211 m ASL. Gate 6 is at 231 m ASL (20 m above), confirmed as the hardware-fixed gate to use.
-4. Same physical radar for both comparisons — JOYRAD-35 scans vertical (~25 min) then tilts to 19° — so calibration is identical and shared bias cancels in the differential.
+1. **CloudNet lowest gate:** 255 m AMSL (gate 0 of the categorize file height grid).
+2. **No diameter filter:** FWD uses all drop sizes. A D-filter was considered but removed because it creates an asymmetry the radar cannot replicate — the radar sees all hydrometeors regardless of size.
+3. **Tower gate:** Tower Parsivel (452070) is at 211 m ASL. Gate 6 is at 231 m ASL (~20 m above), confirmed by inspecting actual ZNC range arrays. This is a hardware-fixed gate; do not change it.
+4. **Same physical radar:** JOYRAD-35 scans vertical (~25 min) then tilts to 19° (~2 min burst). Same calibration constant in both modes. Therefore, systematic radar bias is identical in Comparison A and B and cancels in the differential `Bias_B − Bias_A`.
+5. **Expected bias magnitude:** Both comparisons show a large shared bias of approximately **−6 to −7 dB** (Ze_radar < Ze_FWD). This is not a bug — it likely reflects a systematic Parsivel overestimation of Ze (known in the literature). The scientifically interesting quantity is the **differential** between the two comparisons, which was observed to be approximately **~0.2 dB** — that is the actual vertical-separation signal. The large shared bias is irrelevant to the research question.
+6. **Forward simulation:** T-matrix scattering at 35.5 GHz. Elevation angle (19° for Tower, 90° for CloudNet) is passed to the simulation because it affects the effective dielectric factor and scattering geometry.
 
 ---
 
