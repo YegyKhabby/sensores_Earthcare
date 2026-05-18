@@ -13,11 +13,10 @@ output/tower/npz/
 output/cloudnet/npz/
 output/comparison/npz/
 
-# Figures are committed so results are visible on GitHub
-# (comment out the lines below to also ignore them)
-# output/tower/*.png
-# output/cloudnet/*.png
-# output/comparison/*.png
+# Generated outputs — all regeneratable, not tracked
+output/**/*.png
+output/**/*.html
+output/**/*.csv
 
 # OS
 .DS_Store

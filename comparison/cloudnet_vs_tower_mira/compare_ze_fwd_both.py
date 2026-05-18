@@ -734,9 +734,12 @@ def process_month(year_month_str):
                 h_m_ref      = h_m
                 for hl in h_labels:
                     all_cn_cols[hl] = []
+            n_rows = len(merged_cn)
             for hl in h_labels_ref:
                 if hl in h_labels:
                     all_cn_cols[hl].append(merged_cn[hl].values)
+                else:
+                    all_cn_cols[hl].append(np.full(n_rows, np.nan))
 
         if aligned_tw is not None:
             all_tw_fwd.append(aligned_tw['ze_fwd'])
@@ -815,15 +818,19 @@ def process_period(month_list):
     print(f'{"="*62}')
 
     all_cn_fwd, all_cn_rr, all_cn_cols = [], [], {}
+    all_cn_month = []
     all_tw_fwd, all_tw_rad, all_tw_rr  = [], [], []
+    all_tw_month = []
     h_labels_ref = h_m_ref = ranges_m_ref = None
 
     for ym in month_list:
         data = process_month(ym)
 
         if data['cn_fwd'] is not None:
+            n = len(data['cn_fwd'])
             all_cn_fwd.append(data['cn_fwd'])
             all_cn_rr.append(data['cn_rr'])
+            all_cn_month.append(np.full(n, ym))
             if h_labels_ref is None:
                 h_labels_ref = data['h_labels']
                 h_m_ref      = data['h_m']
@@ -833,9 +840,11 @@ def process_period(month_list):
                 all_cn_cols[hl].append(data['cn_cols'][hl])
 
         if data['tw_fwd'] is not None:
+            n = len(data['tw_fwd'])
             all_tw_fwd.append(data['tw_fwd'])
             all_tw_rad.append(data['tw_rad'])
             all_tw_rr.append(data['tw_rr'])
+            all_tw_month.append(np.full(n, ym))
             if ranges_m_ref is None:
                 ranges_m_ref = data['ranges_m']
 
@@ -863,6 +872,27 @@ def process_period(month_list):
         plot_side_by_side(merged_all_cn, h_labels_ref, h_m_ref,
                           {'ze_fwd': tw_fwd_all, 'ze_rad': tw_rad_all, 'rr': tw_rr_all},
                           ranges_m_ref, label, out_dir_all)
+
+    # ── Save paired CSV for bias HTML ────────────────────────────────────────
+    out_dir_all.mkdir(parents=True, exist_ok=True)
+    if all_cn_fwd and h_labels_ref is not None:
+        cn_df = pd.DataFrame({'month': np.concatenate(all_cn_month),
+                               'ze_fwd': cn_fwd_all, 'rr': cn_rr_all})
+        for hl, arr in cn_cols_all.items():
+            cn_df[hl] = arr
+        cn_csv = out_dir_all / f'cn_paired_{label}.csv'
+        cn_df.to_csv(cn_csv, index=False)
+        print(f'        Saved paired CSV → {cn_csv.name}')
+
+    if all_tw_fwd and ranges_m_ref is not None:
+        heights_asl = gate_heights(ranges_m_ref)
+        tw_cols = {f'ze_gate{g}_{heights_asl[g]:.0f}m': tw_rad_all[:, g]
+                   for g in range(N_TW_GATES)}
+        tw_df = pd.DataFrame({'month': np.concatenate(all_tw_month),
+                               'ze_fwd': tw_fwd_all, 'rr': tw_rr_all, **tw_cols})
+        tw_csv = out_dir_all / f'tw_paired_{label}.csv'
+        tw_df.to_csv(tw_csv, index=False)
+        print(f'        Saved paired CSV → {tw_csv.name}')
 
     print(f'\n  Period done. Months with CN data: {len(all_cn_fwd)}  '
           f'| Months with Tower data: {len(all_tw_fwd)}')

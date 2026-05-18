@@ -31,7 +31,7 @@ OUT_DIR       = Path(__file__).resolve().parents[1] / "output" / "cloudnet"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 HEIGHT_MAX_KM = 10.0
-ZE_MIN, ZE_MAX = -60, 30
+ZE_MIN, ZE_MAX = -60, 60
 PX_PER_DAY     = 300   # height in pixels for each day row-pair
 
 
