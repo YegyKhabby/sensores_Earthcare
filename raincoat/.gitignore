@@ -1,0 +1,4 @@
+samplefiles/radar/
+samplefiles/parsivel/
+__pycache__/
+*.pyc
