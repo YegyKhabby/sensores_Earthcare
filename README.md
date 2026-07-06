@@ -1,9 +1,46 @@
-# Jülich 35 GHz Tower Radar – Zg Processing & CloudNet Comparison
+# Ze Vertical Separation Error — JOYCE / JOYRAD-35
 
-**Instrument:** JOYRAD-35 cloud radar, Jülich Research Centre  
-**Tower height:** 120 m AGL (all range gates require `+120 m` correction for AGL)  
-**Observation day used for development:** 2025-06-06  
-**Source directory:** `/data/obs/site/jue/joyrad35/2025/06/06`
+**Research question:** How much does radar reflectivity (Ze) change between the surface and the lowest radar gate, purely due to vertical separation? We estimate this by running two parallel comparisons — one that controls for instrument error alone, and one that combines instrument error with vertical separation — and taking the difference.
+
+**Site:** JOYCE (Jülich Observatory for Cloud Evolution), Jülich Research Centre, Germany.  
+**Period analysed:** February 2025 and June–July 2025.
+
+---
+
+## Scientific background
+
+Ze at the surface is measured via a Parsivel disdrometer, which records the raindrop size distribution (DSD). From the DSD we forward-simulate Ze using T-matrix scattering at 35.5 GHz. Simultaneously, the JOYRAD-35 Ka-band cloud radar measures Ze directly at its lowest range gate (~255 m ASL), several hundred metres above the surface.
+
+The question is: how different is Ze at the surface vs at the lowest gate, and how do we separate that vertical signal from instrument calibration error?
+
+**Answer: two comparisons, one differential.**
+
+| | Parsivel | Radar beam | Purpose |
+|---|---|---|---|
+| **Comparison A (Tower)** | Tower Parsivel, 211 m ASL | JOYRAD-35 tilted 19°, gate 6 (~231 m ASL) | Control — same air volume, quantifies instrument error only |
+| **Comparison B (CloudNet)** | JOYCE Parsivel, 114 m ASL | CloudNet Ze, lowest gate (~255 m ASL) | Main measurement — instrument error + vertical separation |
+
+```
+Vertical separation error = Bias_B − Bias_A
+                          = Bias(CloudNet) − Bias(Tower)
+```
+
+Both comparisons use the same physical radar (JOYRAD-35), so any systematic calibration bias cancels in the differential.
+
+**Expected results:** Both comparisons show a large shared bias of approximately −6 to −7 dB (Ze_radar < Ze_FWD) — this is likely a known Parsivel overestimation of Ze, not a bug. The scientifically interesting quantity, the differential, is approximately **~0.2 dB**.
+
+---
+
+## Instruments
+
+| Instrument | Location | Altitude | Temporal resolution |
+|---|---|---|---|
+| JOYRAD-35 (vertical mode) | JOYCE site | — | 30 sec (~25 min / 30 min cycle) |
+| JOYRAD-35 (tilted 19°, Tower mode) | JOYCE site | — | ~1 sec (2 min burst / 30 min) |
+| JOYCE Parsivel | Surface, JOYCE site | 114 m ASL | 1 min |
+| Tower Parsivel (452070) | Tower | 211 m ASL | 1 min |
+
+The JOYRAD-35 alternates between vertical scanning (feeds CloudNet) and 19°-tilted scanning (feeds Tower ZNC files) within each 30-minute cycle. It is the **same physical radar with a single calibration** for both modes.
 
 ---
 
@@ -11,217 +48,168 @@
 
 ```
 Feb2026_new/
-├── README.md
-├── .gitignore
+├── README.md                              ← this file
+├── comparison_spec.md                     ← full workflow specification (authoritative)
+├── AUDIT.md                               ← status of every script
+├── filters_reference.md                   ← all filters applied / considered
+├── data_paths.md                          ← example data file paths (2025-06-06)
 │
-├── tower/                          ← JOYRAD-35 tower radar scripts
-│   ├── inspect_znc.py              ← metadata dump & storage-format proof
-│   ├── list_tower.py               ← list HDF5 contents of tower.znc files
-│   ├── check_zg_dimensions.py      ← quick dimension check
-│   ├── show_zg_time.py             ← preview Zg + time from a single file
-│   ├── plot_zg_heatmap.py          ← single-file heatmap (Z + dBZ)
-│   ├── plot_daily_heatmap.py       ← full-day heatmap (Z + dBZ)
-│   ├── zg_stats_all_file_day.py    ← per-file dBZ statistics
-│   ├── zg_db_stats.py              ← dBZ stats + .npz export
-│   └── low_bins_stats.py           ← low-altitude bin analysis
+├── comparison/
+│   └── cloudnet_vs_tower_mira/            ← CURRENT production scripts
+│       ├── compare_ze_fwd_both.py         ← main comparison script (Comparison A + B)
+│       ├── bias_stats.py                  ← statistics module (N, bias, CI, RMSE, r)
+│       ├── test_bias_stats.py             ← unit tests for bias_stats (16 tests)
+│       ├── plot_bias_html.py              ← interactive HTML builder (draft, needs rewrite)
+│       └── COMPARISON_LOGIC_AUDIT.md      ← history of all logic decisions and fixes
 │
-├── cloudnet/                       ← CloudNet data analysis
-│   └── inspect_cloudnet.py         ← metadata overview for CloudNet .nc files
+├── cloudnet/                              ← CloudNet data inspection and heatmaps
+│   ├── plot_ze_heatmap_monthly_html.py    ← monthly Ze heatmap (interactive HTML)
+│   ├── plot_ze_heatmap_monthly.py         ← monthly Ze heatmap (static PNG)
+│   ├── plot_ze_heatmap_20250606.py        ← single-day Ze heatmap (diagnostic)
+│   ├── inspect_categorize_20250606.py     ← NetCDF variable dump (diagnostic)
+│   ├── analyze_saturation_jun05_06_07.py  ← Ze saturation investigation (diagnostic)
+│   └── check_max_ze_gates_0to7.py         ← max Ze per gate May-Jul 2025 (diagnostic)
 │
-├── comparison/                     ← Tower ↔ CloudNet cross-comparison
-│   └── compare_ze.py               ← Ze scatter, bias profile, side-by-side heatmap
+├── tower/                                 ← Tower radar ZNC file tools
+│   ├── inspect_znc.py                     ← full metadata dump + HDF5 quirk workaround
+│   ├── plot_daily_heatmap.py              ← full-day reflectivity heatmap
+│   ├── plot_zg_heatmap.py                 ← single-file heatmap
+│   ├── zg_stats_all_file_day.py           ← per-file dBZ statistics
+│   ├── zg_db_stats.py                     ← dBZ stats + .npz export
+│   ├── low_bins_stats.py                  ← stats for lowest N height bins
+│   ├── list_tower.py, check_zg_dimensions.py, show_zg_time.py  ← inspection tools
 │
-└── output/
-    ├── tower/                      ← figures from tower scripts
-    │   ├── zg_heatmap_Z_2min.png
-    │   ├── zg_heatmap_dBZ_2min.png
-    │   ├── zg_daily_heatmap_Z.png
-    │   ├── zg_daily_heatmap_dBZ.png
-    │   └── npz/                    ← derived arrays (gitignored, regenerate with zg_db_stats.py)
-    ├── cloudnet/                   ← figures from cloudnet scripts
-    └── comparison/                 ← figures from comparison scripts
+├── wawa_compare/                          ← WaWa precipitation-type code comparison
+│   ├── compare_wawa_joyce_bonn_2025.py    ← JOYCE vs Bonn Parsivel WaWa agreement
+│   └── compare_wawa_bonn_tower_2025.py    ← Bonn vs Tower Parsivel WaWa agreement
+│
+├── comparison/                            ← Superseded scripts (reference only)
+│   ├── compare_ze_fwd_cloudnet*.py
+│   ├── compare_ze_fwd_tower*.py
+│   └── initialscript_*.py
+│
+├── download_data.py                        ← bulk rsync download from remote SSH host
+├── test_matching.py                        ← diagnostic: temporal matching test on 2025-06-06
+└── raincoat/                              ← external library (not part of this project)
 ```
+
+Output folders (`output/`) are gitignored — all figures and CSVs are regeneratable.
 
 ---
 
-## Critical storage fact: Zg is LINEAR, not dBZ
+## Running the main comparison
 
-The `Zg` dataset in `*tower.znc` files is stored as **linear Z [mm⁶/m³]**.  
-The attribute `db=1` is a **display hint** for the instrument GUI, not a storage format flag.  
-The attribute `units='Z'` is the CF-convention symbol for linear reflectivity factor.
+### Primary script: `compare_ze_fwd_both.py`
 
-| What you see in file | What it means |
-|---|---|
-| `Zg[i,j] = 0.000279` | Minimum signal: 10·log10(0.000279) = **−35.5 dBZ** ✓ |
-| `Zg[i,j] = 77.2` | Strong cloud: 10·log10(77.2) = **+18.9 dBZ** ✓ |
-| `db = 1` | "Show in log scale in GUI" — does NOT mean stored in dBZ |
+Runs both Comparison A (Tower) and Comparison B (CloudNet) for one or more dates.
+Produces per-day scatter PNGs and pooled paired CSVs.
 
-### Correct conversion formulas
-
-```python
-# Pixel-wise:
-Zg_dBZ = 10 * np.log10(Zg_stored)          # stored linear → dBZ
-
-# Correct mean dBZ (average in linear domain FIRST, then convert):
-mean_dBZ = 10 * np.log10(np.nanmean(Zg_stored))
-
-# WRONG (direct dBZ average — gives geometric mean, underestimates):
-# mean_dBZ = np.nanmean(10 * np.log10(Zg_stored))   ← DO NOT USE
+```bash
+cd comparison/cloudnet_vs_tower_mira
+python3 compare_ze_fwd_both.py
 ```
 
----
+Key constants at the top of the script:
 
-## Masking
-
-The only quality flag used is **`Saturatedco`** (0/1 per pixel):
-
-| Value | Meaning | Action |
+| Constant | Value | Meaning |
 |---|---|---|
-| `0` | Normal measurement | **Keep** |
-| `1` | ADC saturated — signal clipped | **Mask → NaN** |
+| `TOWER_GATE` | 6 | Hardware-fixed gate in Tower ZNC files (~231 m ASL) |
+| `TOL_S` | 30.0 s | Matching window half-width (±30 s around each Parsivel minute) |
+| `CN_TIME_SHIFT_S` | 30.0 s | CloudNet timestamps shifted back for hydrometeor fall time |
+| `ELEV_DEG` | 19.0° | JOYRAD-35 tilt angle in Tower mode |
+| `SITE_ALT_M` | 114.0 m | JOYCE site altitude ASL |
+| `DISDRO_ALT_M` | 211.0 m | Tower Parsivel altitude ASL |
 
-In this dataset: exactly 1 pixel per time step is flagged, always at range gate 1
-(~0.18 km range) — persistent near-field / tower clutter.
+**Timestamp corrections applied before matching:**
+- Parsivel timestamps mark the *end* of the 1-minute window: subtract 30 s to get the midpoint.
+- CloudNet Ze at ~255 m ASL was measured ~30 s before the drops reach the surface Parsivel: subtract 30 s from CloudNet timestamps before matching.
+
+**Quality filters applied:**
+- Rain rate >= 0.1 mm/h (Parsivel)
+- `Saturatedco == 0` (Tower radar)
+- CloudNet `category_bits` bit 1 set (falling hydrometeors present)
+- CloudNet `category_bits` bit 5 clear (no insects)
+
+### Statistics module
 
 ```python
-zg[sat == 1.0] = np.nan   # applied in all scripts
+from comparison.cloudnet_vs_tower_mira.bias_stats import compute_stats
+
+stats = compute_stats(ze_fwd_array, ze_radar_array, n_boot=5000)
+# Returns: N, mean, median, std, ci_lo, ci_hi, rmse, slope, intercept, r, p
+```
+
+### CloudNet heatmaps
+
+```bash
+python3 cloudnet/plot_ze_heatmap_monthly.py       # static PNG
+python3 cloudnet/plot_ze_heatmap_monthly_html.py  # interactive HTML
 ```
 
 ---
 
-## Tower scripts (`tower/`)
+## Key physics details
 
-### `plot_zg_heatmap.py`
-Single-file (~2 min) reflectivity heatmap. Produces **two PNG files**:
-- `output/tower/zg_heatmap_Z_2min.png` — linear Z, plasma colormap + LogNorm
-- `output/tower/zg_heatmap_dBZ_2min.png` — Zg (dBZ), viridis, vmin=−35 / vmax=+20
+### Ze storage in Tower ZNC files
 
-```bash
-python3 tower/plot_zg_heatmap.py [path/to/file.znc]
-```
+`Zg` is stored as **linear Z [mm6/m3]**, not dBZ. The attribute `db=1` is a GUI display hint, not a storage format flag.
 
-### `plot_daily_heatmap.py`
-Full-day heatmap from all 48 files. Produces **two PNG files**:
-- `output/tower/zg_daily_heatmap_dBZ.png` — viridis, −35 to +20 dBZ
-- `output/tower/zg_daily_heatmap_Z.png` — plasma + LogNorm(1e-3, 1e3) mm⁶/m³
-
-```bash
-python3 tower/plot_daily_heatmap.py [date_dir]
-```
-
-Design: each ~2-minute file block is stretched to 20 min visual width on the
-24-hour x-axis so profiles are visible; gaps between files appear as white bands.
-
-### `zg_stats_all_file_day.py`
-Per-file and daily dBZ statistics table.
-Columns: `Max(dBZ)`, `Min(dBZ)`, `Mean(dBZ)`, `Median(dBZ)`, `NaN%`, `Sat`
-
-```bash
-python3 tower/zg_stats_all_file_day.py [date_dir]
-```
-
-### `zg_db_stats.py`
-Per-file dBZ stats **+ saves `.npz` archives** to `output/tower/npz/`.
-
-```bash
-python3 tower/zg_db_stats.py [date_dir] [out_dir]
-```
-
-Each `.npz` contains:
-
-| Key | Shape | dtype | Description |
-|---|---|---|---|
-| `Zg_dBZ` | (n_time, n_height) | float32 | 10·log10(Z_linear)  [dBZ] |
-| `Z_linear` | (n_time, n_height) | float32 | Stored linear Z  [mm⁶/m³] |
-| `time_unix` | (n_time,) | float64 | Unix timestamps [s] |
-| `range_m` | (n_height,) | float32 | Range from radar [m] |
-| `filename` | scalar | str | Source filename |
-
-Load example:
 ```python
-import numpy as np
-d = np.load("output/tower/npz/20250606_000647_tower.npz")
-Zg_dbz  = d["Zg_dBZ"]    # dBZ  (n_time, n_height)
-Z_lin   = d["Z_linear"]  # mm⁶/m³
-ELV_DEG = 19.0
-# Slant range → vertical height AGL at tower base
-h_agl   = d["range_m"] * np.sin(np.deg2rad(ELV_DEG)) + 120.0
-# To get equivalent height AGL at the JOYCE/CloudNet site (97 m higher, 330 m away):
-h_agl_joyce = h_agl - 97.0
+Zg_dBZ = 10 * np.log10(Zg_stored)  # correct conversion
+
+# Correct mean over a window — average linearly, then convert:
+mean_dBZ = 10 * np.log10(np.nanmean(Zg_window))
+# WRONG: np.nanmean(10 * np.log10(Zg_window))  ← never average dBZ directly
 ```
 
-### `low_bins_stats.py`
-Statistics for the lowest N height bins (default: 10, covering 0.14 – 0.47 km).
+### Known HDF5 quirk in ZNC files
 
-```bash
-python3 tower/low_bins_stats.py [date_dir] [n_bins]
+The `time` dataset has dtype `int32` but reports `H5T_NO_CLASS` in the low-level h5py API, causing `ds[:]` to fail. Fix used everywhere:
+
+```python
+t = ds.astype('float64')[:]
 ```
 
-### `inspect_znc.py`
-Full metadata dump, storage-format proof, fill-value scan, Saturatedco analysis.
+### Forward simulation
 
-```bash
-python3 tower/inspect_znc.py <file.znc>
-```
+Ze is simulated from the Parsivel DSD using **T-matrix scattering at 35.5 GHz**. The elevation angle (19° for Tower, 90° for CloudNet vertical beam) is passed to the simulation because it affects the effective dielectric factor and scattering geometry.
 
 ---
 
-## CloudNet scripts (`cloudnet/`)
+## Available rain dates
 
-### `inspect_cloudnet.py`
-Prints all variables, dimensions, global attributes, and key statistics from
-a CloudNet categorization or classification `.nc` file.
+### Tower comparison (Comparison A) — 18 dates
+February 2025: 0216, 0222, 0224, 0225, 0226, 0227, 0228  
+June 2025: 0601, 0605, 0606, 0607, 0608, 0614, 0615, 0623, 0624, 0626, 0627
 
-```bash
-python3 cloudnet/inspect_cloudnet.py <cloudnet_file.nc>
-```
-
-**Important:** CloudNet heights are AGL from the **surface** (z=0 at ground).
-When comparing with tower data, apply: `tower_h_AGL = range_m + 120`.
+### CloudNet comparison (Comparison B) — 3 dates processed so far
+20250605, 20250606, 20250607 (more dates to be added to match Tower date range)
 
 ---
 
-## Comparison scripts (`comparison/`)
+## Pending work
 
-### `compare_ze.py`
-Cross-compares Tower Zg with CloudNet Ze. Requires a CloudNet categorization
-`.nc` file and the tower `.npz` files.
+1. **Add `rain_block_min` column** to paired CSVs in `compare_ze_fwd_both.py` (see `comparison_spec.md` Step 1)
+2. **Rewrite `plot_bias_html.py`** following Steps 3–11 in `comparison_spec.md` (interactive Plotly dashboard: scatter, Bland-Altman, violin per gate, bias profile, monthly evolution)
+3. **Extend CloudNet comparison** to cover all 18 Tower dates
 
-```bash
-python3 comparison/compare_ze.py <cloudnet_file.nc> [output/tower/npz]
-```
-
-Without a CloudNet file, running the script prints a diagnostic about available
-tower data (useful for checking the .npz layout before you have the CloudNet file).
-
-**Outputs** (saved to `output/comparison/`):
-- `Ze_heatmap_side_by_side_<date>.png` — CloudNet | Tower side-by-side daily heatmap
-- `Ze_scatter_<date>.png` — scatter plot, bias and RMSE in title
-- `Ze_bias_profile_<date>.png` — mean (Tower − CloudNet) per height bin ± 1 std
+See [`comparison_spec.md`](comparison_spec.md) for the full step-by-step implementation plan.  
+See [`AUDIT.md`](AUDIT.md) for the current status of every script and output folder.
 
 ---
 
-## Daily statistics (2025-06-06, Saturatedco masked)
+## Dependencies
 
-| Metric | Value |
-|---|---|
-| Files | 48 |
-| Total time steps | 6,372 |
-| Height gates | 445  (0.14 – 16.12 km range) |
-| Max Zg | +28.7 dBZ |
-| Min Zg | −60.2 dBZ |
-| **Mean Zg** | **+7.4 dBZ**  `= 10·log10(nanmean(Z_linear))` |
-| Median Zg | −21.6 dBZ |
-| Missing / NaN | 67.1 % |
-| Saturatedco masked | 6,372 pixels  (1 per time step, gate 1, ~0.18 km) |
-
----
-
-## Known HDF5 quirk (fixed in all scripts)
-
-The `time` dataset has dtype `int32` but reports `H5T_NO_CLASS` (class id 0)
-in the low-level h5py API, causing `ds[:]` to raise:
 ```
-Unsupported integer size (0)
+numpy
+scipy
+pandas
+matplotlib
+plotly
+h5py
+netCDF4
+pytmatrix   (T-matrix forward simulation)
 ```
-**Fix used everywhere:** `ds.astype('float64')[:]`
+
+Data files are on the Jülich Research Centre file system at `/data/obs/site/jue/`.  
+Use `download_data.py` to rsync from the remote SSH host.
